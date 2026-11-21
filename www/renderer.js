@@ -3,7 +3,7 @@ const SUPABASE_URL = 'https://fexhvolqvvttcylbvyod.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_NsrHHvkMhNlkkzKXd1_lig_aiaK-smL';
 // ---------------------------------------------
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const authScreen = document.getElementById('auth-screen');
 const appScreen = document.getElementById('app-screen');
