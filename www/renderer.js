@@ -1,7 +1,7 @@
 // --- KENDİ SUPABASE BİLGİLERİNİ BURAYA YAZ ---
 const SUPABASE_URL = 'https://fexhvolqvvttcylbvyod.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_NsrHHvkMhNlkkzKXd1_lig_aiaK-smL';
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.2';
 
 // ---------------------------------------------
 
