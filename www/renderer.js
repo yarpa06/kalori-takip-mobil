@@ -363,8 +363,18 @@ async function checkMobileUpdate() {
       if (banner && textEl && btnEl) {
         textEl.textContent = 'Yeni sürüm (v' + info.version + ') hazır!';
         btnEl.onclick = function () {
-          window.open(info.apkUrl, '_system');
+          const a = document.createElement('a');
+          a.href = info.apkUrl;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () {
+            window.location.href = info.apkUrl;
+          }, 300);
         };
+
         banner.style.display = 'flex';
       }
     }
