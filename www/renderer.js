@@ -1,11 +1,9 @@
 // --- KENDİ SUPABASE BİLGİLERİNİ BURAYA YAZ ---
-import { createClient } from 'https://esm.sh';
 const SUPABASE_URL = 'https://fexhvolqvvttcylbvyod.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_NsrHHvkMhNlkkzKXd1_lig_aiaK-smL';
 // ---------------------------------------------
-
-
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_URL = 'https://SENIN_PROJE_ID.supabase.co';
+const SUPABASE_ANON_KEY = 'SENIN_SUPABASE_ANON_KEYIN';
 
 const authScreen = document.getElementById('auth-screen');
 const appScreen = document.getElementById('app-screen');
@@ -27,7 +25,7 @@ const formStatus = document.getElementById('form-status');
 
 const numberFormat = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 });
 let currentDate = getTodayStr();
-let currentUser = null;
+let session = JSON.parse(localStorage.getItem('sb_session') || 'null');
 
 function getTodayStr() {
   const d = new Date();
@@ -53,17 +51,20 @@ function getGoal() {
   return Number(localStorage.getItem('daily_goal')) || 2000;
 }
 
-async function fetchAndRender(targetDate = currentDate) {
-  try {
-    const { data: { session }, error: sessionErr } = await sb.auth.getSession();
-    if (sessionErr) throw sessionErr;
-    currentUser = session?.user || null;
-  } catch (err) {
-    setStatus(authStatus, 'Oturum kontrol hatası: ' + err.message, 'error');
-    currentUser = null;
+function authHeaders(extra = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'apikey': SUPABASE_ANON_KEY,
+    ...extra
+  };
+  if (session?.access_token) {
+    headers['Authorization'] = 'Bearer ' + session.access_token;
   }
+  return headers;
+}
 
-  if (!currentUser) {
+async function fetchAndRender(targetDate = currentDate) {
+  if (!session || !session.access_token || !session.user) {
     authScreen.hidden = false;
     appScreen.hidden = true;
     return;
@@ -74,30 +75,37 @@ async function fetchAndRender(targetDate = currentDate) {
   currentDate = targetDate;
   datePicker.value = currentDate;
 
-  document.getElementById('user-email-label').textContent = currentUser.email;
-  document.getElementById('user-avatar').textContent = (currentUser.email || '?').charAt(0).toUpperCase();
+  const email = session.user.email || '';
+  document.getElementById('user-email-label').textContent = email;
+  document.getElementById('user-avatar').textContent = (email || '?').charAt(0).toUpperCase();
 
-  const { data: mealsData, error } = await sb
-    .from('meals')
-    .select('*')
-    .eq('date', currentDate)
-    .order('created_at', { ascending: false });
+  try {
+    const mealsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/meals?date=eq.${currentDate}&order=created_at.desc`,
+      { headers: authHeaders() }
+    );
+    if (mealsRes.status === 401) {
+      session = null;
+      localStorage.removeItem('sb_session');
+      return fetchAndRender(currentDate);
+    }
+    const meals = mealsRes.ok ? await mealsRes.json() : [];
 
-  if (error) {
-    setStatus(formStatus, error.message, 'error');
-    return;
+    const waterRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/water_logs?date=eq.${currentDate}&select=amount_ml`,
+      { headers: authHeaders() }
+    );
+    const waterRows = waterRes.ok ? await waterRes.json() : [];
+    const waterMl = waterRows.length ? Number(waterRows[0].amount_ml) : 0;
+
+    renderDashboard(meals, waterMl);
+  } catch (err) {
+    setStatus(formStatus, 'Bağlantı hatası: ' + err.message, 'error');
   }
+}
 
-  const { data: waterRow } = await sb
-    .from('water_logs')
-    .select('amount_ml')
-    .eq('date', currentDate)
-    .maybeSingle();
-
-  const meals = mealsData || [];
-  const waterMl = waterRow ? Number(waterRow.amount_ml) : 0;
+function renderDashboard(meals, waterMl) {
   const goal = getGoal();
-
   const isToday = currentDate === getTodayStr();
   todayBtn.hidden = isToday;
 
@@ -170,7 +178,10 @@ async function fetchAndRender(targetDate = currentDate) {
     remove.type = 'button';
     remove.textContent = 'Sil';
     remove.addEventListener('click', async () => {
-      await sb.from('meals').delete().eq('id', meal.id);
+      await fetch(`${SUPABASE_URL}/rest/v1/meals?id=eq.${meal.id}`, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
       fetchAndRender(currentDate);
     });
     side.append(kcal, macros, remove);
@@ -184,15 +195,38 @@ async function handleAuth(action) {
   const email = authEmail.value.trim();
   const password = authPassword.value;
   if (!email || !password) return setStatus(authStatus, 'E-posta ve şifre girin.', 'error');
+
   loginBtn.disabled = true;
   registerBtn.disabled = true;
   setStatus(authStatus, 'Sunucuya bağlanılıyor...');
+
   try {
-    const { error } = action === 'login'
-      ? await sb.auth.signInWithPassword({ email, password })
-      : await sb.auth.signUp({ email, password });
-    if (error) throw error;
-    setStatus(authStatus, 'Giriş başarılı!', 'ok');
+    const endpoint = action === 'login'
+      ? `${SUPABASE_URL}/auth/v1/token?grant_type=password`
+      : `${SUPABASE_URL}/auth/v1/signup`;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error_description || data.msg || data.message || 'Giriş başarısız.');
+    }
+
+    if (!data.access_token) {
+      setStatus(authStatus, 'Kayıt tamamlandı! Şimdi Giriş Yap butonuna basın.', 'ok');
+      return;
+    }
+
+    session = data;
+    localStorage.setItem('sb_session', JSON.stringify(session));
+    setStatus(authStatus, '');
     authPassword.value = '';
     await fetchAndRender(currentDate);
   } catch (err) {
@@ -205,8 +239,9 @@ async function handleAuth(action) {
 
 loginBtn.addEventListener('click', () => handleAuth('login'));
 registerBtn.addEventListener('click', () => handleAuth('register'));
-logoutBtn.addEventListener('click', async () => {
-  await sb.auth.signOut();
+logoutBtn.addEventListener('click', () => {
+  session = null;
+  localStorage.removeItem('sb_session');
   currentDate = getTodayStr();
   fetchAndRender(currentDate);
 });
@@ -221,67 +256,83 @@ goalInput.addEventListener('change', () => {
 });
 
 async function changeWater(deltaMl) {
-  const { data: existing } = await sb.from('water_logs').select('amount_ml').eq('date', currentDate).maybeSingle();
-  const currentMl = existing ? Number(existing.amount_ml) : 0;
-  const nextMl = Math.max(0, Math.min(20000, currentMl + deltaMl));
-  await sb.from('water_logs').upsert(
-    { user_id: currentUser.id, date: currentDate, amount_ml: nextMl, updated_at: new Date().toISOString() },
-    { onConflict: 'user_id,date' }
+  const waterRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/water_logs?date=eq.${currentDate}&select=amount_ml`,
+    { headers: authHeaders() }
   );
+  const rows = waterRes.ok ? await waterRes.json() : [];
+  const currentMl = rows.length ? Number(rows[0].amount_ml) : 0;
+  const nextMl = Math.max(0, Math.min(20000, currentMl + deltaMl));
+
+  await fetch(`${SUPABASE_URL}/rest/v1/water_logs?on_conflict=user_id,date`, {
+    method: 'POST',
+    headers: authHeaders({ 'Prefer': 'resolution=merge-duplicates' }),
+    body: JSON.stringify({
+      user_id: session.user.id,
+      date: currentDate,
+      amount_ml: nextMl,
+      updated_at: new Date().toISOString()
+    })
+  });
   fetchAndRender(currentDate);
 }
 
 document.getElementById('add-water').addEventListener('click', () => changeWater(250));
 document.getElementById('sub-water').addEventListener('click', () => changeWater(-250));
-
 addButton.addEventListener('click', async () => {
-  const text = mealText.value.trim();
-  if (!text) return setStatus(formStatus, 'Önce ne yediğini yaz.', 'error');
-  addButton.disabled = true;
-  setStatus(formStatus, 'Yapay zeka hesaplıyor...');
-  try {
-    const { data, error } = await sb.functions.invoke('hesapla', {
-      body: { mealType: mealType.value, text }
-    });
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-
-    await sb.from('meals').insert({
-      user_id: currentUser.id,
-      date: currentDate,
-      meal_type: mealType.value,
-      food_text: text,
-      title: data.title || 'Öğün',
-      calories: Number(data.calories) || 0,
-      protein: Number(data.protein) || 0,
-      carbs: Number(data.carbs) || 0,
-      fat: Number(data.fat) || 0
-    });
-    mealText.value = '';
-    setStatus(formStatus, 'Öğün eklendi.', 'ok');
-    await fetchAndRender(currentDate);
-  } catch (err) {
-    setStatus(formStatus, err.message, 'error');
-  } finally {
-    addButton.disabled = false;
-  }
+const text = mealText.value.trim();
+if (!text) return setStatus(formStatus, 'Önce ne yediğini yaz.', 'error');
+addButton.disabled = true;
+setStatus(formStatus, 'Yapay zeka hesaplıyor...');
+try {
+const fnRes = await fetch(${SUPABASE_URL}/functions/v1/hesapla, {
+method: 'POST',
+headers: authHeaders(),
+body: JSON.stringify({ mealType: mealType.value, text })
 });
-
+const data = await fnRes.json();
+if (!fnRes.ok || data?.error) throw new Error(data?.error || 'Hesaplama başarısız.');
+const insRes = await fetch(${SUPABASE_URL}/rest/v1/meals, {
+method: 'POST',
+headers: authHeaders(),
+body: JSON.stringify({
+user_id: session.user.id,
+date: currentDate,
+meal_type: mealType.value,
+food_text: text,
+title: data.title || 'Öğün',
+calories: Number(data.calories) || 0,
+protein: Number(data.protein) || 0,
+carbs: Number(data.carbs) || 0,
+fat: Number(data.fat) || 0
+})
+});
+if (!insRes.ok) throw new Error('Buluta kaydedilemedi.');
+mealText.value = '';
+setStatus(formStatus, 'Öğün eklendi.', 'ok');
+await fetchAndRender(currentDate);
+} catch (err) {
+setStatus(formStatus, err.message, 'error');
+} finally {
+addButton.disabled = false;
+}
+});
 document.getElementById('analyze-btn').addEventListener('click', async () => {
 const btn = document.getElementById('analyze-btn');
 const out = document.getElementById('coach-output');
 btn.disabled = true;
 out.textContent = 'Koçun gününü inceliyor...';
 try {
-const { data: meals } = await sb.from('meals').select('*').eq('date', currentDate);
-const { data: water } = await sb.from('water_logs').select('amount_ml').eq('date', currentDate).maybeSingle();
-const list = meals || [];
-const waterMl = water ? Number(water.amount_ml) : 0;
-const summaryText = Tarih: ${currentDate}\nHedef: ${getGoal()} kcal\nAlınan: ${list.reduce((s, m) => s + Number(m.calories), 0)} kcal\nSu: ${waterMl} ml\nÖğünler: ${list.map(m => m.title).join(', ')};
-const { data, error } = await sb.functions.invoke('hesapla', {
-body: { mode: 'analyze', summaryText }
+const mealsRes = await fetch(${SUPABASE_URL}/rest/v1/meals?date=eq.${currentDate}, { headers: authHeaders() });
+const list = mealsRes.ok ? await mealsRes.json() : [];
+const summaryText = Tarih: ${currentDate}\nHedef: ${getGoal()} kcal\nAlınan: ${list.reduce((s, m) => s + Number(m.calories), 0)} kcal\nÖğünler: ${list.map(m => m.title).join(', ')};
+const fnRes = await fetch(${SUPABASE_URL}/functions/v1/hesapla, {
+method: 'POST',
+headers: authHeaders(),
+body: JSON.stringify({ mode: 'analyze', summaryText })
 });
-if (error) throw error;
+const data = await fnRes.json();
+if (!fnRes.ok || data?.error) throw new Error(data?.error || 'Analiz alınamadı.');
 out.textContent = data?.advice || 'Gayet iyi gidiyorsun!';
 } catch (err) {
 out.textContent = 'Uyarı: ' + err.message;
