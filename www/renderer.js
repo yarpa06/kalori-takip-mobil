@@ -362,18 +362,16 @@ async function checkMobileUpdate() {
       const btnEl = document.getElementById('update-btn');
       if (banner && textEl && btnEl) {
         textEl.textContent = 'Yeni sürüm (v' + info.version + ') hazır!';
-        btnEl.onclick = function () {
-          const a = document.createElement('a');
-          a.href = info.apkUrl;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          setTimeout(function () {
-            window.location.href = info.apkUrl;
-          }, 300);
+        btnEl.onclick = async function () {
+          try {
+            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Browser) {
+              await window.Capacitor.Plugins.Browser.open({ url: info.apkUrl });
+              return;
+            }
+          } catch (err) {}
+          window.open(info.apkUrl, '_system');
         };
+
 
         banner.style.display = 'flex';
       }
