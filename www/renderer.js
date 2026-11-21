@@ -352,17 +352,19 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
 fetchAndRender(currentDate);
 async function checkMobileUpdate() {
   try {
-    const res = await fetch('https://githubusercontent.com' + Date.now());
+    const url = 'https://githubusercontent.com' + Date.now();
+    const res = await fetch(url);
     if (!res.ok) return;
     const info = await res.json();
     if (info && info.version && info.version !== APP_VERSION) {
       const banner = document.getElementById('update-banner');
       const textEl = document.getElementById('update-text');
-      const linkEl = document.getElementById('update-link');
-      if (banner && textEl && linkEl) {
+      const btnEl = document.getElementById('update-btn');
+      if (banner && textEl && btnEl) {
         textEl.textContent = 'Yeni sürüm (v' + info.version + ') hazır!';
-        linkEl.href = info.apkUrl;
-        banner.hidden = false;
+        btnEl.onclick = function () {
+          window.open(info.apkUrl, '_system');
+        };
         banner.style.display = 'flex';
       }
     }
