@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kalori Takip</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- GİRİŞ / KAYIT EKRANI -->
+  <main class="app" id="auth-screen">
+    <section class="panel composer">
+      <p class="eyebrow">Bulut Hesabı</p>
+      <h1>Yapay Zeka Kalori Takip</h1>
+      <p class="hint">Verilerinizin bulutta güvenle saklanması ve her cihazdan erişebilmeniz için giriş yapın.</p>
+      
+      <label class="field-label" for="auth-email">E-posta Adresi</label>
+      <input id="auth-email" type="email" placeholder="ornek@email.com" />
+      
+      <label class="field-label" for="auth-password">Şifre (En az 6 karakter)</label>
+      <input id="auth-password" type="password" placeholder="••••••" />
+      
+      <div class="row">
+        <button class="primary" id="login-btn" type="button">Giriş Yap</button>
+        <button class="ghost" id="register-btn" type="button">Kayıt Ol</button>
+      </div>
+      <p class="status" id="auth-status" role="status"></p>
+    </section>
+  </main>
+
+  <!-- ANA UYGULAMA EKRANI -->
+  <main class="app" id="app-screen" hidden>
+    <header class="top">
+      <div>
+        <div class="user-profile-bar">
+          <div class="user-badge">
+            <span class="user-avatar" id="user-avatar">?</span>
+            <span class="user-email" id="user-email-label">kullanici@email.com</span>
+          </div>
+          <button class="ghost small-btn" id="logout-btn" type="button">Çıkış Yap</button>
+        </div>
+        <h1>Yapay Zeka Kalori Takip</h1>
+        <p class="date" id="today-label"></p>
+      </div>
+
+      <div class="top-right-panel">
+        <div class="row">
+          <input id="date-picker" type="date" aria-label="Tarih seçin" />
+          <button class="ghost" id="today-btn" type="button">Bugüne Dön</button>
+        </div>
+
+        <div class="mini-coach" id="coach-panel">
+          <div class="mini-coach-head">
+            <span class="coach-title">✨ Yapay Zeka Koçu</span>
+            <button class="primary small-btn" id="analyze-btn" type="button">Analiz Et</button>
+          </div>
+          <p id="coach-output">Günün özetini görmek için analizi başlat.</p>
+        </div>
+      </div>
+    </header>
+
+
+
+    <section class="summary">
+      <article class="card">
+        <span>Günlük hedef</span>
+        <div class="goal-line">
+          <input id="goal" type="number" min="1" max="20000" step="50" value="2000" aria-label="Günlük kalori hedefi" />
+          <em class="unit">kcal</em>
+        </div>
+      </article>
+      <article class="card">
+        <span>Alınan</span>
+        <p class="stat" id="consumed">0</p>
+      </article>
+      <article class="card">
+        <span>Kalan</span>
+        <p class="stat" id="remaining">2000</p>
+      </article>
+      <article class="card macros">
+        <div class="macro"><span>Protein</span><strong id="protein">0 g</strong></div>
+        <div class="macro"><span>Karbonhidrat</span><strong id="carbs">0 g</strong></div>
+        <div class="macro"><span>Yağ</span><strong id="fat">0 g</strong></div>
+      </article>
+      <article class="card progress-card">
+        <div class="progress-meta">
+          <span>Günün ilerlemesi</span>
+          <span id="progress-label">0 / 2000 kcal</span>
+        </div>
+        <div class="bar" aria-hidden="true"><div class="fill" id="progress-fill"></div></div>
+      </article>
+      <article class="card progress-card" id="water-card">
+        <div class="progress-meta">
+          <span>Su Tüketimi (Hedef: 2.5 L)</span>
+          <span id="water-label">0 / 2500 ml (0 Bardak)</span>
+        </div>
+        <div class="bar" aria-hidden="true"><div class="fill" id="water-fill"></div></div>
+        <div class="row">
+          <button class="primary" id="add-water" type="button">+1 Bardak (250 ml)</button>
+          <button class="ghost" id="sub-water" type="button">-250 ml</button>
+        </div>
+      </article>
+    </section>
+
+
+
+
+    
+    <div class="bottom-grid">
+      <section class="panel composer">
+        <div class="composer-head">
+          <h2>Öğün ekle</h2>
+          <select id="meal-type" aria-label="Öğün">
+            <option>Sabah</option>
+            <option>Öğle</option>
+            <option>Akşam</option>
+            <option>Ara Öğün</option>
+          </select>
+        </div>
+        <label class="field-label" for="meal-text">Ne yedin?</label>
+        <textarea id="meal-text" placeholder="Sabah 2 haşlanmış yumurta, 1 dilim tam buğday ekmeği yedim"></textarea>
+        <div class="row">
+          <button class="primary" id="add-meal" type="button">Hesapla ve Ekle</button>
+          <p class="status" id="form-status" role="status"></p>
+        </div>
+      </section>
+
+      <section class="panel meals-panel">
+        <div class="list-head">
+          <h2>Bugünün öğünleri</h2>
+        </div>
+        <div class="list" id="meal-list"></div>
+      </section>
+    </div>
+
+
+
+
+  </main>
+  <footer class="app-footer">
+    <span>© 2026 <strong>Brought to life by Yunus Emre ARPA </strong> · Yapay Zeka Kalori Takip · v1.0</span>
+  </footer>
+    <script src="https://jsdelivr.net"></script>
+  <script src="renderer.js"></script>
+</body>
+
+  <script src="renderer.js"></script>
+</body>
+  <script src="renderer.js"></script>
+</body>
+</html>
