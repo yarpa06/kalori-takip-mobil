@@ -1,6 +1,8 @@
 // --- KENDİ SUPABASE BİLGİLERİNİ BURAYA YAZ ---
 const SUPABASE_URL = 'https://fexhvolqvvttcylbvyod.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_NsrHHvkMhNlkkzKXd1_lig_aiaK-smL';
+const APP_VERSION = '1.0.0';
+
 // ---------------------------------------------
 
 
@@ -348,3 +350,23 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
 });
 
 fetchAndRender(currentDate);
+async function checkMobileUpdate() {
+  try {
+    const res = await fetch('https://githubusercontent.com' + Date.now());
+    if (!res.ok) return;
+    const info = await res.json();
+    if (info && info.version && info.version !== APP_VERSION) {
+      const banner = document.getElementById('update-banner');
+      const textEl = document.getElementById('update-text');
+      const linkEl = document.getElementById('update-link');
+      if (banner && textEl && linkEl) {
+        textEl.textContent = 'Yeni sürüm (v' + info.version + ') hazır!';
+        linkEl.href = info.apkUrl;
+        banner.hidden = false;
+        banner.style.display = 'flex';
+      }
+    }
+  } catch (e) {}
+}
+
+checkMobileUpdate();
