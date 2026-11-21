@@ -278,65 +278,73 @@ async function changeWater(deltaMl) {
 
 document.getElementById('add-water').addEventListener('click', () => changeWater(250));
 document.getElementById('sub-water').addEventListener('click', () => changeWater(-250));
+
 addButton.addEventListener('click', async () => {
-const text = mealText.value.trim();
-if (!text) return setStatus(formStatus, 'Önce ne yediğini yaz.', 'error');
-addButton.disabled = true;
-setStatus(formStatus, 'Yapay zeka hesaplıyor...');
-try {
-const fnRes = await fetch(${SUPABASE_URL}/functions/v1/hesapla, {
-method: 'POST',
-headers: authHeaders(),
-body: JSON.stringify({ mealType: mealType.value, text })
+  const text = mealText.value.trim();
+  if (!text) return setStatus(formStatus, 'Önce ne yediğini yaz.', 'error');
+  addButton.disabled = true;
+  setStatus(formStatus, 'Yapay zeka hesaplıyor...');
+  try {
+    const fnRes = await fetch(SUPABASE_URL + '/functions/v1/hesapla', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ mealType: mealType.value, text })
+    });
+    const data = await fnRes.json();
+    if (!fnRes.ok || data?.error) throw new Error(data?.error || 'Hesaplama başarısız.');
+
+    const insRes = await fetch(SUPABASE_URL + '/rest/v1/meals', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        user_id: session.user.id,
+        date: currentDate,
+        meal_type: mealType.value,
+        food_text: text,
+        title: data.title || 'Öğün',
+        calories: Number(data.calories) || 0,
+        protein: Number(data.protein) || 0,
+        carbs: Number(data.carbs) || 0,
+        fat: Number(data.fat) || 0
+      })
+    });
+    if (!insRes.ok) throw new Error('Buluta kaydedilemedi.');
+
+    mealText.value = '';
+    setStatus(formStatus, 'Öğün eklendi.', 'ok');
+    await fetchAndRender(currentDate);
+  } catch (err) {
+    setStatus(formStatus, err.message, 'error');
+  } finally {
+    addButton.disabled = false;
+  }
 });
-const data = await fnRes.json();
-if (!fnRes.ok || data?.error) throw new Error(data?.error || 'Hesaplama başarısız.');
-const insRes = await fetch(${SUPABASE_URL}/rest/v1/meals, {
-method: 'POST',
-headers: authHeaders(),
-body: JSON.stringify({
-user_id: session.user.id,
-date: currentDate,
-meal_type: mealType.value,
-food_text: text,
-title: data.title || 'Öğün',
-calories: Number(data.calories) || 0,
-protein: Number(data.protein) || 0,
-carbs: Number(data.carbs) || 0,
-fat: Number(data.fat) || 0
-})
-});
-if (!insRes.ok) throw new Error('Buluta kaydedilemedi.');
-mealText.value = '';
-setStatus(formStatus, 'Öğün eklendi.', 'ok');
-await fetchAndRender(currentDate);
-} catch (err) {
-setStatus(formStatus, err.message, 'error');
-} finally {
-addButton.disabled = false;
-}
-});
+
 document.getElementById('analyze-btn').addEventListener('click', async () => {
-const btn = document.getElementById('analyze-btn');
-const out = document.getElementById('coach-output');
-btn.disabled = true;
-out.textContent = 'Koçun gününü inceliyor...';
-try {
-const mealsRes = await fetch(${SUPABASE_URL}/rest/v1/meals?date=eq.${currentDate}, { headers: authHeaders() });
-const list = mealsRes.ok ? await mealsRes.json() : [];
-const summaryText = Tarih: ${currentDate}\nHedef: ${getGoal()} kcal\nAlınan: ${list.reduce((s, m) => s + Number(m.calories), 0)} kcal\nÖğünler: ${list.map(m => m.title).join(', ')};
-const fnRes = await fetch(${SUPABASE_URL}/functions/v1/hesapla, {
-method: 'POST',
-headers: authHeaders(),
-body: JSON.stringify({ mode: 'analyze', summaryText })
+  const btn = document.getElementById('analyze-btn');
+  const out = document.getElementById('coach-output');
+  btn.disabled = true;
+  out.textContent = 'Koçun gününü inceliyor...';
+  try {
+    const mealsRes = await fetch(SUPABASE_URL + '/rest/v1/meals?date=eq.' + currentDate, { headers: authHeaders() });
+    const list = mealsRes.ok ? await mealsRes.json() : [];
+    const totalCal = list.reduce((s, m) => s + Number(m.calories || 0), 0);
+    const mealNames = list.map((m) => m.title || '').join(', ');
+    const summaryText = 'Tarih: ' + currentDate + ', Hedef: ' + getGoal() + ' kcal, Alınan: ' + totalCal + ' kcal, Öğünler: ' + mealNames;
+
+    const fnRes = await fetch(SUPABASE_URL + '/functions/v1/hesapla', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ mode: 'analyze', summaryText })
+    });
+    const data = await fnRes.json();
+    if (!fnRes.ok || (data && data.error)) throw new Error((data && data.error) || 'Analiz alınamadı.');
+    out.textContent = (data && data.advice) || 'Gayet iyi gidiyorsun!';
+  } catch (err) {
+    out.textContent = 'Uyarı: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
 });
-const data = await fnRes.json();
-if (!fnRes.ok || data?.error) throw new Error(data?.error || 'Analiz alınamadı.');
-out.textContent = data?.advice || 'Gayet iyi gidiyorsun!';
-} catch (err) {
-out.textContent = 'Uyarı: ' + err.message;
-} finally {
-btn.disabled = false;
-}
-});
+
 fetchAndRender(currentDate);
