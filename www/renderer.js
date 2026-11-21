@@ -1,7 +1,11 @@
 // --- KENDİ SUPABASE BİLGİLERİNİ BURAYA YAZ ---
+import { createClient } from 'https://esm.sh';
 const SUPABASE_URL = 'https://fexhvolqvvttcylbvyod.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_NsrHHvkMhNlkkzKXd1_lig_aiaK-smL';
 // ---------------------------------------------
+
+
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const authScreen = document.getElementById('auth-screen');
 const appScreen = document.getElementById('app-screen');
@@ -11,29 +15,6 @@ const authStatus = document.getElementById('auth-status');
 const loginBtn = document.getElementById('login-btn');
 const registerBtn = document.getElementById('register-btn');
 const logoutBtn = document.getElementById('logout-btn');
-
-// Uygulama açılışında herhangi bir hata olursa ekranda kırmızı yazıyla göster
-window.onerror = function (msg, url, line) {
-  if (authStatus) {
-    authStatus.textContent = 'Hata (Satır ' + line + '): ' + msg;
-    authStatus.style.color = '#f87171';
-  }
-};
-
-let sb = null;
-try {
-  const clientFactory = window.supabase?.createClient || (typeof supabase !== 'undefined' ? supabase.createClient : null);
-  if (!clientFactory) {
-    throw new Error('supabase.js kütüphanesi yüklenemedi!');
-  }
-  sb = clientFactory(SUPABASE_URL, SUPABASE_ANON_KEY);
-} catch (e) {
-  if (authStatus) {
-    authStatus.textContent = 'Başlatma hatası: ' + e.message;
-    authStatus.style.color = '#f87171';
-  }
-}
-
 
 const datePicker = document.getElementById('date-picker');
 const todayBtn = document.getElementById('today-btn');
@@ -56,8 +37,12 @@ function getTodayStr() {
 }
 
 function setStatus(element, message, kind) {
+  if (!element) return;
   element.textContent = message || '';
   element.className = kind ? `status ${kind}` : 'status';
+  if (kind === 'error') element.style.color = '#f87171';
+  else if (kind === 'ok') element.style.color = '#34d399';
+  else element.style.color = '#94a3b8';
 }
 
 function formatKcal(value) {
@@ -69,8 +54,14 @@ function getGoal() {
 }
 
 async function fetchAndRender(targetDate = currentDate) {
-  const { data: { session } } = await sb.auth.getSession();
-  currentUser = session?.user || null;
+  try {
+    const { data: { session }, error: sessionErr } = await sb.auth.getSession();
+    if (sessionErr) throw sessionErr;
+    currentUser = session?.user || null;
+  } catch (err) {
+    setStatus(authStatus, 'Oturum kontrol hatası: ' + err.message, 'error');
+    currentUser = null;
+  }
 
   if (!currentUser) {
     authScreen.hidden = false;
@@ -92,7 +83,10 @@ async function fetchAndRender(targetDate = currentDate) {
     .eq('date', currentDate)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    setStatus(formStatus, error.message, 'error');
+    return;
+  }
 
   const { data: waterRow } = await sb
     .from('water_logs')
@@ -192,17 +186,17 @@ async function handleAuth(action) {
   if (!email || !password) return setStatus(authStatus, 'E-posta ve şifre girin.', 'error');
   loginBtn.disabled = true;
   registerBtn.disabled = true;
-  setStatus(authStatus, 'Bağlanıyor...');
+  setStatus(authStatus, 'Sunucuya bağlanılıyor...');
   try {
     const { error } = action === 'login'
       ? await sb.auth.signInWithPassword({ email, password })
       : await sb.auth.signUp({ email, password });
     if (error) throw error;
-    setStatus(authStatus, '');
+    setStatus(authStatus, 'Giriş başarılı!', 'ok');
     authPassword.value = '';
     await fetchAndRender(currentDate);
   } catch (err) {
-    setStatus(authStatus, err.message, 'error');
+    setStatus(authStatus, 'Hata: ' + err.message, 'error');
   } finally {
     loginBtn.disabled = false;
     registerBtn.disabled = false;
@@ -274,15 +268,15 @@ addButton.addEventListener('click', async () => {
 });
 
 document.getElementById('analyze-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('analyze-btn');
-  const out = document.getElementById('coach-output');
-  btn.disabled = true;
-  out.textContent = 'Koçun gününü inceliyor...';
-  try {
-    const { data: meals } = await sb.from('meals').select('*').eq('date', currentDate);
-    const { data: water } = await sb.from('water_logs').select('amount_ml').eq('date', currentDate).maybeSingle();
-    const list = meals || [];
-	const waterMl = water ? Number(water.amount_ml) : 0;
+const btn = document.getElementById('analyze-btn');
+const out = document.getElementById('coach-output');
+btn.disabled = true;
+out.textContent = 'Koçun gününü inceliyor...';
+try {
+const { data: meals } = await sb.from('meals').select('*').eq('date', currentDate);
+const { data: water } = await sb.from('water_logs').select('amount_ml').eq('date', currentDate).maybeSingle();
+const list = meals || [];
+const waterMl = water ? Number(water.amount_ml) : 0;
 const summaryText = Tarih: ${currentDate}\nHedef: ${getGoal()} kcal\nAlınan: ${list.reduce((s, m) => s + Number(m.calories), 0)} kcal\nSu: ${waterMl} ml\nÖğünler: ${list.map(m => m.title).join(', ')};
 const { data, error } = await sb.functions.invoke('hesapla', {
 body: { mode: 'analyze', summaryText }
