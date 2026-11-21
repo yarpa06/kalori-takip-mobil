@@ -3,8 +3,6 @@ const SUPABASE_URL = 'https://fexhvolqvvttcylbvyod.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_NsrHHvkMhNlkkzKXd1_lig_aiaK-smL';
 // ---------------------------------------------
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
 const authScreen = document.getElementById('auth-screen');
 const appScreen = document.getElementById('app-screen');
 const authEmail = document.getElementById('auth-email');
@@ -13,6 +11,29 @@ const authStatus = document.getElementById('auth-status');
 const loginBtn = document.getElementById('login-btn');
 const registerBtn = document.getElementById('register-btn');
 const logoutBtn = document.getElementById('logout-btn');
+
+// Uygulama açılışında herhangi bir hata olursa ekranda kırmızı yazıyla göster
+window.onerror = function (msg, url, line) {
+  if (authStatus) {
+    authStatus.textContent = 'Hata (Satır ' + line + '): ' + msg;
+    authStatus.style.color = '#f87171';
+  }
+};
+
+let sb = null;
+try {
+  const clientFactory = window.supabase?.createClient || (typeof supabase !== 'undefined' ? supabase.createClient : null);
+  if (!clientFactory) {
+    throw new Error('supabase.js kütüphanesi yüklenemedi!');
+  }
+  sb = clientFactory(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  if (authStatus) {
+    authStatus.textContent = 'Başlatma hatası: ' + e.message;
+    authStatus.style.color = '#f87171';
+  }
+}
+
 
 const datePicker = document.getElementById('date-picker');
 const todayBtn = document.getElementById('today-btn');
